@@ -24,55 +24,80 @@ __all__ = (
     "Message",
     "MessageReplyPayload",
     "SystemMessageContent",
-    )
+    "Component",
+)
+
 
 class UserAddContent(TypedDict):
     id: str
     by: str
 
+
 class UserRemoveContent(TypedDict):
     id: str
     by: str
+
 
 class UserJoinedContent(TypedDict):
     id: str
     by: str
 
+
 class UserLeftContent(TypedDict):
     id: str
+
 
 class UserKickedContent(TypedDict):
     id: str
 
+
 class UserBannedContent(TypedDict):
     id: str
+
 
 class ChannelRenameContent(TypedDict):
     name: str
     by: str
 
+
 class ChannelDescriptionChangeContent(TypedDict):
     by: str
 
+
 class ChannelIconChangeContent(TypedDict):
     by: str
+
 
 class Masquerade(TypedDict, total=False):
     name: str
     avatar: str
     colour: str
 
+
 class Interactions(TypedDict):
     reactions: NotRequired[list[str]]
     restrict_reactions: NotRequired[bool]
 
-SystemMessageContent = Union[UserAddContent, UserRemoveContent, UserJoinedContent, UserLeftContent, UserKickedContent, UserBannedContent, ChannelRenameContent, ChannelDescriptionChangeContent, ChannelIconChangeContent]
+
+SystemMessageContent = Union[
+    UserAddContent,
+    UserRemoveContent,
+    UserJoinedContent,
+    UserLeftContent,
+    UserKickedContent,
+    UserBannedContent,
+    ChannelRenameContent,
+    ChannelDescriptionChangeContent,
+    ChannelIconChangeContent,
+]
+
 
 class Message(TypedDict):
     _id: str
     channel: str
     author: str
     content: str
+    components: NotRequired[list[Component]]
     system: NotRequired[SystemMessageContent]
     attachments: NotRequired[list[File]]
     embeds: NotRequired[list[Embed]]
@@ -83,6 +108,14 @@ class Message(TypedDict):
     interactions: NotRequired[Interactions]
     reactions: dict[str, list[str]]
 
+
 class MessageReplyPayload(TypedDict):
     id: str
     mention: bool
+
+
+class Component(TypedDict):
+    type: str
+    label: str
+    style: str
+    enabled: bool

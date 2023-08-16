@@ -8,9 +8,11 @@ class Client(revolt.Client):
         if message.content == "hello":
             await message.channel.send("hi how are you")
 
+
 async def main():
     async with aiohttp.ClientSession() as session:
         client = Client(session, "BOT TOKEN HERE")
         await client.start()
+
 
 asyncio.run(main())

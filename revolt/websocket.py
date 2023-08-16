@@ -6,28 +6,44 @@ import time
 from copy import copy
 from typing import TYPE_CHECKING, Callable, NamedTuple, cast
 
+from .types.gateway import InteractionEventPayload
+
 from .errors import RevoltError
 from . import utils
 from .channel import GroupDMChannel, TextChannel, VoiceChannel
 from .enums import RelationshipType
 from .role import Role
-from .types import (BulkMessageDeleteEventPayload, ChannelCreateEventPayload,
-                    ChannelDeleteEventPayload, ChannelDeleteTypingEventPayload,
-                    ChannelStartTypingEventPayload, ChannelUpdateEventPayload)
+from .types import (
+    BulkMessageDeleteEventPayload,
+    ChannelCreateEventPayload,
+    ChannelDeleteEventPayload,
+    ChannelDeleteTypingEventPayload,
+    ChannelStartTypingEventPayload,
+    ChannelUpdateEventPayload,
+)
 from .types import Member as MemberPayload
 from .types import MemberID as MemberIDPayload
 from .types import Message as MessagePayload
-from .types import (MessageDeleteEventPayload, MessageReactEventPayload,
-                    MessageRemoveReactionEventPayload,
-                    MessageUnreactEventPayload, MessageUpdateEventPayload)
+from .types import (
+    MessageDeleteEventPayload,
+    MessageReactEventPayload,
+    MessageRemoveReactionEventPayload,
+    MessageUnreactEventPayload,
+    MessageUpdateEventPayload,
+)
 from .types import Role as RolePayload
-from .types import (ServerCreateEventPayload, ServerDeleteEventPayload,
-                    ServerMemberJoinEventPayload,
-                    ServerMemberLeaveEventPayload,
-                    ServerMemberUpdateEventPayload,
-                    ServerRoleDeleteEventPayload, ServerRoleUpdateEventPayload,
-                    ServerUpdateEventPayload, UserRelationshipEventPayload,
-                    UserUpdateEventPayload)
+from .types import (
+    ServerCreateEventPayload,
+    ServerDeleteEventPayload,
+    ServerMemberJoinEventPayload,
+    ServerMemberLeaveEventPayload,
+    ServerMemberUpdateEventPayload,
+    ServerRoleDeleteEventPayload,
+    ServerRoleUpdateEventPayload,
+    ServerUpdateEventPayload,
+    UserRelationshipEventPayload,
+    UserUpdateEventPayload,
+)
 from .user import Status, User, UserProfile
 
 import aiohttp
@@ -41,6 +57,7 @@ use_msgpack: bool
 
 try:
     import msgpack
+
     use_msgpack = True
 except ImportError:
     use_msgpack = False
@@ -49,22 +66,47 @@ if TYPE_CHECKING:
     import aiohttp
 
     from .state import State
-    from .types import (AuthenticatePayload, BasePayload, MessageEventPayload,
-                        ReadyEventPayload)
+    from .types import (
+        AuthenticatePayload,
+        BasePayload,
+        MessageEventPayload,
+        ReadyEventPayload,
+    )
     from .message import Message
+
 
 class WSMessage(NamedTuple):
     type: aiohttp.WSMsgType
     data: str | bytes | aiohttp.WSCloseCode
 
+
 __all__: tuple[str, ...] = ("WebsocketHandler",)
 
 logger: logging.Logger = logging.getLogger("revolt")
 
-class WebsocketHandler:
-    __slots__ = ("session", "token", "ws_url", "dispatch", "state", "websocket", "loop", "user", "ready", "server_events")
 
-    def __init__(self, session: aiohttp.ClientSession, token: str, ws_url: str, dispatch: Callable[..., None], state: State):
+class WebsocketHandler:
+    __slots__ = (
+        "session",
+        "token",
+        "ws_url",
+        "dispatch",
+        "state",
+        "websocket",
+        "loop",
+        "user",
+        "ready",
+        "server_events",
+    )
+
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        token: str,
+        ws_url: str,
+        dispatch: Callable[..., None],
+        state: State,
+    ):
         self.session: aiohttp.ClientSession = session
         self.token: str = token
         self.ws_url: str = ws_url
@@ -93,10 +135,7 @@ class WebsocketHandler:
             await asyncio.sleep(15)
 
     async def send_authenticate(self) -> None:
-        payload: AuthenticatePayload = {
-            "type": "Authenticate",
-            "token": self.token
-        }
+        payload: AuthenticatePayload = {"type": "Authenticate", "token": self.token}
 
         await self.send_payload(payload)
 
@@ -133,7 +172,6 @@ class WebsocketHandler:
         for server in payload["servers"]:
             self.state.add_server(server)
 
-
         for member in payload["members"]:
             self.state.add_member(member["_id"]["server"], member)
 
@@ -151,8 +189,14 @@ class WebsocketHandler:
 
         message = self.state.add_message(cast(MessagePayload, payload))
 
-
         self.dispatch("message", message)
+
+    async def handle_interaction(self, payload: InteractionEventPayload) -> None:
+        if server := self.state.get_channel(payload["channel_id"]).server_id:
+            await self._wait_for_server_ready(server)
+
+        message = self.state.get_message(payload["message_id"])
+        self.dispatch("interaction", payload, message)
 
     async def handle_messageupdate(self, payload: MessageUpdateEventPayload) -> None:
         self.dispatch("raw_message_update", payload)
@@ -182,7 +226,6 @@ class WebsocketHandler:
             await self._wait_for_server_ready(server_id)
 
         self.state.messages.remove(message)
-
 
         self.dispatch("message_delete", message)
 
@@ -216,7 +259,6 @@ class WebsocketHandler:
                 if isinstance(channel, (TextChannel, VoiceChannel, GroupDMChannel)):
                     channel.description = None
 
-
         self.dispatch("channel_update", old_channel, channel)
 
     async def handle_channeldelete(self, payload: ChannelDeleteEventPayload) -> None:
@@ -227,7 +269,9 @@ class WebsocketHandler:
 
         self.dispatch("channel_delete", channel)
 
-    async def handle_channelstarttyping(self, payload: ChannelStartTypingEventPayload) -> None:
+    async def handle_channelstarttyping(
+        self, payload: ChannelStartTypingEventPayload
+    ) -> None:
         channel = self.state.get_channel(payload["id"])
 
         if server_id := channel.server_id:
@@ -237,7 +281,9 @@ class WebsocketHandler:
 
         self.dispatch("typing_start", channel, user)
 
-    async def handle_channelstoptyping(self, payload: ChannelDeleteTypingEventPayload) -> None:
+    async def handle_channelstoptyping(
+        self, payload: ChannelDeleteTypingEventPayload
+    ) -> None:
         channel = self.state.get_channel(payload["id"])
 
         if server_id := channel.server_id:
@@ -266,7 +312,6 @@ class WebsocketHandler:
             elif clear == "Description":
                 server.description = None
 
-
         self.dispatch("server_update", old_server, server)
 
     async def handle_serverdelete(self, payload: ServerDeleteEventPayload) -> None:
@@ -292,7 +337,9 @@ class WebsocketHandler:
 
         self.dispatch("server_join", server)
 
-    async def handle_servermemberupdate(self, payload: ServerMemberUpdateEventPayload) -> None:
+    async def handle_servermemberupdate(
+        self, payload: ServerMemberUpdateEventPayload
+    ) -> None:
         await self._wait_for_server_ready(payload["id"]["server"])
 
         member = self.state.get_member(payload["id"]["server"], payload["id"]["user"])
@@ -308,13 +355,21 @@ class WebsocketHandler:
 
         self.dispatch("member_update", old_member, member)
 
-    async def handle_servermemberjoin(self, payload: ServerMemberJoinEventPayload) -> None:
+    async def handle_servermemberjoin(
+        self, payload: ServerMemberJoinEventPayload
+    ) -> None:
         # avoid an api request if possible
         if payload["user"] not in self.state.users:
             user = await self.state.http.fetch_user(payload["user"])
             self.state.add_user(user)
 
-        member = self.state.add_member(payload["id"], MemberPayload(_id=MemberIDPayload(server=payload["id"], user=payload["user"]), joined_at=int(time.time())))  # revolt doesnt give us the joined at time
+        member = self.state.add_member(
+            payload["id"],
+            MemberPayload(
+                _id=MemberIDPayload(server=payload["id"], user=payload["user"]),
+                joined_at=int(time.time()),
+            ),
+        )  # revolt doesnt give us the joined at time
 
         self.dispatch("member_join", member)
 
@@ -331,7 +386,9 @@ class WebsocketHandler:
 
         self.dispatch("member_leave", member)
 
-    async def handle_serverroleupdate(self, payload: ServerRoleUpdateEventPayload) -> None:
+    async def handle_serverroleupdate(
+        self, payload: ServerRoleUpdateEventPayload
+    ) -> None:
         server = self.state.get_server(payload["id"])
         await self._wait_for_server_ready(server.id)
 
@@ -340,7 +397,12 @@ class WebsocketHandler:
         except LookupError:
             # the role wasnt found meaning it was just created
 
-            role = Role(cast(RolePayload, payload["data"]), payload["role_id"], server, self.state)
+            role = Role(
+                cast(RolePayload, payload["data"]),
+                payload["role_id"],
+                server,
+                self.state,
+            )
             server._roles[role.id] = role
             self.dispatch("role_create", role)
         else:
@@ -354,7 +416,9 @@ class WebsocketHandler:
 
             self.dispatch("role_update", old_role, role)
 
-    async def handle_serverroledelete(self, payload: ServerRoleDeleteEventPayload) -> None:
+    async def handle_serverroledelete(
+        self, payload: ServerRoleDeleteEventPayload
+    ) -> None:
         server = self.state.get_server(payload["id"])
         role = server._roles.pop(payload["role_id"])
 
@@ -376,7 +440,9 @@ class WebsocketHandler:
                     user.profile = UserProfile(profile.content, None)
 
             elif clear == "StatusText":
-                user.status = Status(None, user.status.presence if user.status else None)
+                user.status = Status(
+                    None, user.status.presence if user.status else None
+                )
 
             elif clear == "Avatar":
                 user.original_avatar = None
@@ -385,18 +451,28 @@ class WebsocketHandler:
 
         self.dispatch("user_update", old_user, user)
 
-    async def handle_userrelationship(self, payload: UserRelationshipEventPayload) -> None:
+    async def handle_userrelationship(
+        self, payload: UserRelationshipEventPayload
+    ) -> None:
         user = self.state.get_user(payload["user"])
         old_relationship = user.relationship
         user.relationship = RelationshipType(payload["status"])
 
-        self.dispatch("user_relationship_update", user, old_relationship, user.relationship)
+        self.dispatch(
+            "user_relationship_update", user, old_relationship, user.relationship
+        )
 
     async def handle_messagereact(self, payload: MessageReactEventPayload) -> None:
         if server := self.state.get_channel(payload["channel_id"]).server_id:
             await self._wait_for_server_ready(server)
 
-        self.dispatch("raw_reaction_add", payload["channel_id"], payload["id"], payload["user_id"], payload["emoji_id"])
+        self.dispatch(
+            "raw_reaction_add",
+            payload["channel_id"],
+            payload["id"],
+            payload["user_id"],
+            payload["emoji_id"],
+        )
 
         try:
             message = utils.get(self.state.messages, id=payload["id"])
@@ -413,7 +489,13 @@ class WebsocketHandler:
         if server := self.state.get_channel(payload["channel_id"]).server_id:
             await self._wait_for_server_ready(server)
 
-        self.dispatch("raw_reaction_remove", payload["channel_id"], payload["id"], payload["user_id"], payload["emoji_id"])
+        self.dispatch(
+            "raw_reaction_remove",
+            payload["channel_id"],
+            payload["id"],
+            payload["user_id"],
+            payload["emoji_id"],
+        )
 
         try:
             message = utils.get(self.state.messages, id=payload["id"])
@@ -425,11 +507,18 @@ class WebsocketHandler:
 
         self.dispatch("reaction_remove", message, user, payload["emoji_id"])
 
-    async def handle_messageremovereaction(self, payload: MessageRemoveReactionEventPayload) -> None:
+    async def handle_messageremovereaction(
+        self, payload: MessageRemoveReactionEventPayload
+    ) -> None:
         if server := self.state.get_channel(payload["channel_id"]).server_id:
             await self._wait_for_server_ready(server)
 
-        self.dispatch("raw_reaction_clear", payload["channel_id"], payload["id"], payload["emoji_id"])
+        self.dispatch(
+            "raw_reaction_clear",
+            payload["channel_id"],
+            payload["id"],
+            payload["emoji_id"],
+        )
 
         try:
             message = utils.get(self.state.messages, id=payload["id"])
@@ -440,7 +529,9 @@ class WebsocketHandler:
 
         self.dispatch("reaction_clear", message, users, payload["emoji_id"])
 
-    async def handle_bulkmessagedelete(self, payload: BulkMessageDeleteEventPayload) -> None:
+    async def handle_bulkmessagedelete(
+        self, payload: BulkMessageDeleteEventPayload
+    ) -> None:
         channel = self.state.get_channel(payload["channel"])
 
         self.dispatch("raw_bulk_message_delete", payload)
@@ -451,7 +542,12 @@ class WebsocketHandler:
             if server_id := channel.server_id:
                 await self._wait_for_server_ready(server_id)
 
-            self.dispatch("raw_message_delete", MessageDeleteEventPayload(type="messagedelete", channel=payload["channel"], id=message_id))
+            self.dispatch(
+                "raw_message_delete",
+                MessageDeleteEventPayload(
+                    type="messagedelete", channel=payload["channel"], id=message_id
+                ),
+            )
 
             try:
                 message = self.state.get_message(message_id)
@@ -476,7 +572,9 @@ class WebsocketHandler:
         asyncio.create_task(self.heartbeat())
 
         async for msg in self.websocket:
-            msg = cast(WSMessage, msg)  # aiohttp doesnt use NamedTuple so the type info is missing
+            msg = cast(
+                WSMessage, msg
+            )  # aiohttp doesnt use NamedTuple so the type info is missing
 
             if use_msgpack:
                 data = cast(bytes, msg.data)

@@ -3,6 +3,8 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any, Coroutine, Optional, Union
 
+from .types.message import Component
+
 
 from .asset import Asset, PartialAsset
 from .channel import DMChannel, GroupDMChannel, TextChannel, SavedMessageChannel
@@ -20,12 +22,8 @@ if TYPE_CHECKING:
     from .user import User
     from .member import Member
 
-__all__ = (
-    "Message",
-    "MessageReply",
-    "Masquerade",
-    "MessageInteractions"
-)
+__all__ = ("Message", "MessageReply", "Masquerade", "MessageInteractions")
+
 
 class Message(Ulid):
     """Represents a message
@@ -36,6 +34,8 @@ class Message(Ulid):
         The id of the message
     content: :class:`str`
         The content of the message, this will not include system message's content
+    conponents:
+        The components of the message
     attachments: list[:class:`Asset`]
         The attachments of the message
     embeds: list[Union[:class:`WebsiteEmbed`, :class:`ImageEmbed`, :class:`TextEmbed`, :class:`NoneEmbed`]]
@@ -59,7 +59,23 @@ class Message(Ulid):
     interactions: Optional[:class:`MessageInteractions`]
         The interactions on the message, if any
     """
-    __slots__ = ("state", "id", "content", "attachments", "embeds", "channel", "author", "edited_at", "mentions", "replies", "reply_ids", "reactions", "interactions")
+
+    __slots__ = (
+        "state",
+        "id",
+        "content",
+        "components",
+        "attachments",
+        "embeds",
+        "channel",
+        "author",
+        "edited_at",
+        "mentions",
+        "replies",
+        "reply_ids",
+        "reactions",
+        "interactions",
+    )
 
     def __init__(self, data: MessagePayload, state: State):
         self.state: State = state
@@ -69,12 +85,22 @@ class Message(Ulid):
 
         self.system_content: SystemMessageContent | None = data.get("system")
 
-        self.attachments: list[Asset] = [Asset(attachment, state) for attachment in data.get("attachments", [])]
-        self.embeds: list[Embed] = [to_embed(embed, state) for embed in data.get("embeds", [])]
+        self.attachments: list[Asset] = [
+            Asset(attachment, state) for attachment in data.get("attachments", [])
+        ]
+        self.embeds: list[Embed] = [
+            to_embed(embed, state) for embed in data.get("embeds", [])
+        ]
+
+        self.components: list[Component] = data.get("components", [])
 
         channel = state.get_channel(data["channel"])
-        assert isinstance(channel, (TextChannel, GroupDMChannel, DMChannel, SavedMessageChannel))
-        self.channel: TextChannel | GroupDMChannel | DMChannel | SavedMessageChannel = channel
+        assert isinstance(
+            channel, (TextChannel, GroupDMChannel, DMChannel, SavedMessageChannel)
+        )
+        self.channel: TextChannel | GroupDMChannel | DMChannel | SavedMessageChannel = (
+            channel
+        )
 
         self.server_id: str | None = self.channel.server_id
 
@@ -138,11 +164,20 @@ class Message(Ulid):
         self.interactions: MessageInteractions | None
 
         if interactions := data.get("interactions"):
-            self.interactions = MessageInteractions(reactions=interactions.get("reactions"), restrict_reactions=interactions.get("restrict_reactions", False))
+            self.interactions = MessageInteractions(
+                reactions=interactions.get("reactions"),
+                restrict_reactions=interactions.get("restrict_reactions", False),
+            )
         else:
             self.interactions = None
 
-    def _update(self, *, content: Optional[str] = None, embeds: Optional[list[EmbedPayload]] = None, edited: Optional[Union[str, int]] = None):
+    def _update(
+        self,
+        *,
+        content: Optional[str] = None,
+        embeds: Optional[list[EmbedPayload]] = None,
+        edited: Optional[Union[str, int]] = None,
+    ):
         if content is not None:
             self.content = content
 
@@ -152,7 +187,13 @@ class Message(Ulid):
         if edited is not None:
             self.edited_at = parse_timestamp(edited)
 
-    async def edit(self, *, content: Optional[str] = None, embeds: Optional[list[SendableEmbed]] = None) -> None:
+    async def edit(
+        self,
+        *,
+        content: Optional[str] = None,
+        embeds: Optional[list[SendableEmbed]] = None,
+        components: Optional[list[Component]] = None,
+    ) -> None:
         """Edits the message. The bot can only edit its own message
 
         Parameters
@@ -165,13 +206,17 @@ class Message(Ulid):
 
         new_embeds = [embed.to_dict() for embed in embeds] if embeds else None
 
-        await self.state.http.edit_message(self.channel.id, self.id, content, new_embeds)
+        await self.state.http.edit_message(
+            self.channel.id, self.id, content, new_embeds, components
+        )
 
     async def delete(self) -> None:
-        """Deletes the message. The bot can only delete its own messages and messages it has permission to delete """
+        """Deletes the message. The bot can only delete its own messages and messages it has permission to delete"""
         await self.state.http.delete_message(self.channel.id, self.id)
 
-    def reply(self, *args: Any, mention: bool = False, **kwargs: Any) -> Coroutine[Any, Any, Message]:
+    def reply(
+        self, *args: Any, mention: bool = False, **kwargs: Any
+    ) -> Coroutine[Any, Any, Message]:
         """Replies to this message, equivilant to:
 
         .. code-block:: python
@@ -191,7 +236,9 @@ class Message(Ulid):
         """
         await self.state.http.add_reaction(self.channel.id, self.id, emoji)
 
-    async def remove_reaction(self, emoji: str, user: Optional[User] = None, remove_all: bool = False) -> None:
+    async def remove_reaction(
+        self, emoji: str, user: Optional[User] = None, remove_all: bool = False
+    ) -> None:
         """Removes a reaction from the message, this can remove either a specific users, the current users reaction or all of a specific emoji
 
         Parameters
@@ -203,7 +250,9 @@ class Message(Ulid):
         remove_all: bool
             Whether or not to remove all reactions for that specific emoji
         """
-        await self.state.http.remove_reaction(self.channel.id, self.id, emoji, user.id if user else None, remove_all)
+        await self.state.http.remove_reaction(
+            self.channel.id, self.id, emoji, user.id if user else None, remove_all
+        )
 
     async def remove_all_reactions(self) -> None:
         """Removes all reactions from the message"""
@@ -220,6 +269,7 @@ class Message(Ulid):
         """
         return self.channel.server
 
+
 class MessageReply:
     """represents a reply to a message.
 
@@ -230,6 +280,7 @@ class MessageReply:
     mention: :class:`bool`
         Whether the reply should mention the author of the message. Defaults to false.
     """
+
     __slots__ = ("message", "mention")
 
     def __init__(self, message: Message, mention: bool = False):
@@ -237,7 +288,8 @@ class MessageReply:
         self.mention: bool = mention
 
     def to_dict(self) -> MessageReplyPayload:
-        return { "id": self.message.id, "mention": self.mention }
+        return {"id": self.message.id, "mention": self.mention}
+
 
 class Masquerade:
     """represents a message's masquerade.
@@ -251,9 +303,15 @@ class Masquerade:
     colour: Optional[:class:`str`]
         The colour of the name, similar to role colours
     """
+
     __slots__ = ("name", "avatar", "colour")
 
-    def __init__(self, name: Optional[str] = None, avatar: Optional[str] = None, colour: Optional[str] = None):
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        avatar: Optional[str] = None,
+        colour: Optional[str] = None,
+    ):
         self.name: str | None = name
         self.avatar: str | None = avatar
         self.colour: str | None = colour
@@ -272,6 +330,7 @@ class Masquerade:
 
         return output
 
+
 class MessageInteractions:
     """Represents a message's interactions, this is for allowing preset reactions and restricting adding reactions to only those.
 
@@ -282,9 +341,12 @@ class MessageInteractions:
     restrict_reactions: bool
         Whether or not users can only react to the interaction's reactions
     """
+
     __slots__ = ("reactions", "restrict_reactions")
 
-    def __init__(self, *, reactions: Optional[list[str]] = None, restrict_reactions: bool = False):
+    def __init__(
+        self, *, reactions: Optional[list[str]] = None, restrict_reactions: bool = False
+    ):
         self.reactions: list[str] | None = reactions
         self.restrict_reactions: bool = restrict_reactions
 
