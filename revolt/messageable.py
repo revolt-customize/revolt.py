@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
+from .types.message import Component
+
 from .enums import SortType
 
 if TYPE_CHECKING:
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
 
 __all__ = ("Messageable",)
 
+
 class Messageable:
     """Base class for all channels that you can send messages in
 
@@ -21,6 +24,7 @@ class Messageable:
     id: :class:`str`
         The id of the channel
     """
+
     state: State
 
     __slots__ = ()
@@ -28,7 +32,19 @@ class Messageable:
     async def _get_channel_id(self) -> str:
         raise NotImplementedError
 
-    async def send(self, content: Optional[str] = None, *, embeds: Optional[list[SendableEmbed]] = None, embed: Optional[SendableEmbed] = None, attachments: Optional[list[File]] = None, replies: Optional[list[MessageReply]] = None, reply: Optional[MessageReply] = None, masquerade: Optional[Masquerade] = None, interactions: Optional[MessageInteractions] = None) -> Message:
+    async def send(
+        self,
+        content: Optional[str] = None,
+        *,
+        embeds: Optional[list[SendableEmbed]] = None,
+        embed: Optional[SendableEmbed] = None,
+        attachments: Optional[list[File]] = None,
+        replies: Optional[list[MessageReply]] = None,
+        reply: Optional[MessageReply] = None,
+        masquerade: Optional[Masquerade] = None,
+        interactions: Optional[MessageInteractions] = None,
+        components: Optional[list[Component]] = None,
+    ) -> Message:
         """Sends a message in a channel, you must send at least one of either `content`, `embeds` or `attachments`
 
         Parameters
@@ -64,9 +80,17 @@ class Messageable:
         masquerade_payload = masquerade.to_dict() if masquerade else None
         interactions_payload = interactions.to_dict() if interactions else None
 
-        message = await self.state.http.send_message(await self._get_channel_id(), content, embed_payload, attachments, reply_payload, masquerade_payload, interactions_payload)
+        message = await self.state.http.send_message(
+            await self._get_channel_id(),
+            content,
+            embed_payload,
+            attachments,
+            reply_payload,
+            masquerade_payload,
+            interactions_payload,
+            components,
+        )
         return self.state.add_message(message)
-
 
     async def fetch_message(self, message_id: str) -> Message:
         """Fetches a message from the channel
@@ -83,10 +107,20 @@ class Messageable:
         """
         from .message import Message
 
-        payload = await self.state.http.fetch_message(await self._get_channel_id(), message_id)
+        payload = await self.state.http.fetch_message(
+            await self._get_channel_id(), message_id
+        )
         return Message(payload, self.state)
 
-    async def history(self, *, sort: SortType = SortType.latest, limit: int = 100, before: Optional[str] = None, after: Optional[str] = None, nearby: Optional[str] = None) -> list[Message]:
+    async def history(
+        self,
+        *,
+        sort: SortType = SortType.latest,
+        limit: int = 100,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        nearby: Optional[str] = None,
+    ) -> list[Message]:
         """Fetches multiple messages from the channel's history
 
         Parameters
@@ -109,10 +143,25 @@ class Messageable:
         """
         from .message import Message
 
-        payloads = await self.state.http.fetch_messages(await self._get_channel_id(), sort=sort, limit=limit, before=before, after=after, nearby=nearby)
+        payloads = await self.state.http.fetch_messages(
+            await self._get_channel_id(),
+            sort=sort,
+            limit=limit,
+            before=before,
+            after=after,
+            nearby=nearby,
+        )
         return [Message(payload, self.state) for payload in payloads]
 
-    async def search(self, query: str, *, sort: SortType = SortType.latest, limit: int = 100, before: Optional[str] = None, after: Optional[str] = None) -> list[Message]:
+    async def search(
+        self,
+        query: str,
+        *,
+        sort: SortType = SortType.latest,
+        limit: int = 100,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+    ) -> list[Message]:
         """searches the channel for a query
 
         Parameters
@@ -135,7 +184,14 @@ class Messageable:
         """
         from .message import Message
 
-        payloads = await self.state.http.search_messages(await self._get_channel_id(), query, sort=sort, limit=limit, before=before, after=after)
+        payloads = await self.state.http.search_messages(
+            await self._get_channel_id(),
+            query,
+            sort=sort,
+            limit=limit,
+            before=before,
+            after=after,
+        )
         return [Message(payload, self.state) for payload in payloads]
 
     async def delete_messages(self, messages: list[Message]) -> None:
@@ -149,4 +205,6 @@ class Messageable:
             The messages for deletion, this can be up to 100 messages
         """
 
-        await self.state.http.delete_messages(await self._get_channel_id(), [message.id for message in messages])
+        await self.state.http.delete_messages(
+            await self._get_channel_id(), [message.id for message in messages]
+        )
