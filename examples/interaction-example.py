@@ -1,49 +1,20 @@
-# Revolt.py
-
-An async library to interact with the <https://revolt.chat> API.
-
-You can join the support server [here](https://rvlt.gg/FDXER6hr) and find the library's documentation [here](https://revoltpy.readthedocs.io/en/latest/).
-
-## Installing
-
-You can use `pip` to install revolt.py. It differs slightly depending on what OS/Distro you use.
-
-On Windows
-
-```
-py -m pip install -U revolt-baidu.py # -U to update
-```
-
-On macOS and Linux
-
-```
-python3 -m pip install -U revolt-baidu.py
-```
-
-## Example
-
-More examples can be found in the [examples folder](https://github.com/revoltchat/revolt.py/blob/master/examples).
-
-```py
-import revolt
 import asyncio
+import aiohttp
+import revolt
+import logging
 
-class Client(revolt.Client):
-    async def on_message(self, message: revolt.Message):
-        if message.content == "hello":
-            await message.channel.send("hi how are you")
 
-async def main():
-    async with revolt.utils.client_session() as session:
-        client = Client(session, "BOT TOKEN HERE")
-        await client.start()
+from revolt.types.gateway import InteractionEventPayload
+from revolt.types.message import Component
 
-asyncio.run(main())
-```
+logger = logging.getLogger("revolt")
+logger.setLevel(logging.DEBUG)
+stream_handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
-## Bot interaction example
 
-```py
 class Client(revolt.Client):
     async def on_interaction(
         self, interaction: InteractionEventPayload, message: revolt.Message
@@ -79,4 +50,16 @@ class Client(revolt.Client):
                     ),
                 ],
             )
-```
+
+
+async def main():
+    async with aiohttp.ClientSession() as session:
+        client = Client(
+            session,
+            "Your Bot Token Here",
+            api_url="Your API Endpoint",
+        )
+        await client.start()
+
+
+asyncio.run(main())
