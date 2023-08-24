@@ -1,29 +1,50 @@
 import asyncio
 import aiohttp
+from langchain import OpenAI
 import revolt
 from langchain.chat_models import ChatOpenAI
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
-import logging
+from revolt.enums import ChannelType
+from revolt.stream_handler import StreamGenerator
+from typing import Any
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from revolt.enums import ChannelType
 
-
-logger = logging.getLogger("revolt")
-logger.setLevel(logging.DEBUG)
-stream_handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
+from langchain.callbacks.base import AsyncCallbackHandler
 
 
-chat_open_ai = ChatOpenAI(model="gpt-4", temperature=0.5, streaming=True)
+chat_open_ai = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.5, streaming=True)
+llm = OpenAI(streaming=True)
 
 state: dict[str, list[BaseMessage]] = {}
 
 
-async def process(history: list[BaseMessage], user_input: str) -> str:
+class StreamingLLMCallbackHandler(AsyncCallbackHandler):
+    """Callback handler for streaming LLM responses."""
+
+    def __init__(self, q: StreamGenerator):
+        self.q = q
+
+    async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        data = {"token": token}
+        print(data)
+        await self.q.push_message(token)
+
+    async def on_llm_end(
+        self,
+        response,
+        **kwargs: Any,
+    ) -> None:
+        await self.q.close()
+
+
+async def process(
+    history: list[BaseMessage],
+    stream_handler: StreamGenerator,
+) -> str:
     response = await chat_open_ai.agenerate(
-        [history], callbacks=[StreamingStdOutCallbackHandler()]
+        [history], callbacks=[StreamingLLMCallbackHandler(stream_handler)]
     )
 
     text = response.generations[0][0].text
@@ -61,10 +82,13 @@ class Client(revolt.Client):
         while len(history) > 10:
             history.pop(0)
 
-        resp = await process(history, message.content)
-        await message.channel.send(
-            resp,
+        g = StreamGenerator()
+        task1 = asyncio.create_task(
+            message.channel.send(stream_generator=g.generator())
         )
+        task2 = asyncio.create_task(process(history, g))
+
+        await asyncio.gather(task1, task2)
 
 
 async def main():
@@ -72,7 +96,7 @@ async def main():
         client = Client(
             session,
             "Your Bot Token Here",
-            api_url="Your API URL",
+            api_url="API Url Here",
         )
         await client.start()
 

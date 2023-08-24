@@ -17,5 +17,6 @@ from .permissions import *
 from .role import *
 from .server import *
 from .user import *
+from .stream_handler import *
 
 __version__ = "0.1.11"
