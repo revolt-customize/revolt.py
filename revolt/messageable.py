@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, AsyncGenerator, Optional
 
 from .types.message import Component
 
@@ -44,6 +44,7 @@ class Messageable:
         masquerade: Optional[Masquerade] = None,
         interactions: Optional[MessageInteractions] = None,
         components: Optional[list[Component]] = None,
+        stream_generator: Optional[AsyncGenerator[str, None]] = None,
     ) -> Message:
         """Sends a message in a channel, you must send at least one of either `content`, `embeds` or `attachments`
 
@@ -63,6 +64,8 @@ class Messageable:
             The masquerade for the message, this can overwrite the username and avatar shown
         interactions: Optional[:class:`MessageInteractions`]
             The interactions for the message
+        stream_generator: Optional[AsyncGenerator[str, None]]
+            The stream generator, if this param isn't None, the message will be considered as streaming message
 
         Returns
         --------
@@ -89,6 +92,7 @@ class Messageable:
             masquerade_payload,
             interactions_payload,
             components,
+            stream_generator=stream_generator,
         )
         return self.state.add_message(message)
 

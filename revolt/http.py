@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
+    AsyncGenerator,
     Coroutine,
     Literal,
     Optional,
@@ -130,7 +131,78 @@ class HttpClient:
         elif resp_code == 401:
             raise Forbidden("401: Missing Permissions")
         else:
-            raise HTTPError(resp_code)
+            raise HTTPError(f"{resp_code}: {text}")
+
+    async def stream_request(
+        self,
+        method: Literal["GET", "POST", "PUT", "DELETE", "PATCH"],
+        channel_id: str,
+        *,
+        json: Optional[dict[str, Any]] = None,
+        nonce: bool = True,
+        params: Optional[dict[str, Any]] = None,
+        stream_generator: AsyncGenerator[str, None],
+    ) -> Any:
+        if not json:
+            json = {}
+
+        if not json.get("content"):
+            val = await stream_generator.__anext__()
+            if not val:
+                raise Exception("Invalid First Message")
+
+            json["content"] = val
+
+        json["is_stream"] = True
+        if nonce:
+            json["nonce"] = ulid.new().str  # type: ignore
+
+        message = await self.request(
+            "POST", f"/channels/{channel_id}/messages", json=json
+        )
+
+        message_id = message["_id"]
+        url = f"{self.api_url}/channels/{channel_id}/messages/{message_id}/stream"
+
+        kwargs = {}
+
+        headers = {
+            "User-Agent": "Revolt.py (https://github.com/revolt-customize/revolt.py)",
+            self.auth_header: self.token,
+        }
+        headers["Content-Type"] = "application/json"
+        kwargs["headers"] = headers
+
+        if params:
+            kwargs["params"] = params
+
+        async def generator():
+            async for message in stream_generator:
+                if message == "":
+                    continue
+
+                yield message.encode()
+
+        kwargs["data"] = generator()
+
+        async with self.session.request(method, url, **kwargs) as resp:
+            text = await resp.text()
+            if text:
+                try:
+                    response = _json.loads(await resp.text())
+                except ValueError:
+                    raise HTTPError(f"Invalid json response:\n{text}") from None
+            else:
+                response = text
+
+        resp_code = resp.status
+
+        if 200 <= resp_code <= 300:
+            return response
+        elif resp_code == 401:
+            raise Forbidden("401: Missing Permissions")
+        else:
+            raise HTTPError(f"{resp_code} : {text}")
 
     async def upload_file(
         self,
@@ -168,6 +240,7 @@ class HttpClient:
         masquerade: Optional[MasqueradePayload],
         interactions: Optional[InteractionsPayload],
         components: Optional[list[Component]],
+        stream_generator: Optional[AsyncGenerator[str, None]] = None,
     ) -> MessagePayload:
         json: dict[str, Any] = {}
 
@@ -197,6 +270,12 @@ class HttpClient:
 
         if components:
             json["components"] = components
+
+        if stream_generator:
+            return await self.stream_request(
+                "POST", channel, stream_generator=stream_generator, json=json
+            )
+
         return await self.request("POST", f"/channels/{channel}/messages", json=json)
 
     def edit_message(
