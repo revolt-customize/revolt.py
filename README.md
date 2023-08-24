@@ -22,7 +22,7 @@ python3 -m pip install -U revolt-baidu.py
 
 ## Example
 
-More examples can be found in the [examples folder](https://github.com/psychopurp/revolt.py/tree/dev/examples).
+More examples can be found in the [examples folder](https://github.com/revolt-customize/revolt.py/tree/master/examples).
 
 ```py
 import revolt
