@@ -177,6 +177,7 @@ class Message(Ulid):
         content: Optional[str] = None,
         embeds: Optional[list[EmbedPayload]] = None,
         edited: Optional[Union[str, int]] = None,
+        components: Optional[list[Component]] = None,
     ):
         if content is not None:
             self.content = content
@@ -186,6 +187,9 @@ class Message(Ulid):
 
         if edited is not None:
             self.edited_at = parse_timestamp(edited)
+
+        if components:
+            self.components = components
 
     async def edit(
         self,
