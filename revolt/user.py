@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from weakref import WeakValueDictionary
 
-from revolt.types.user import UserRelation
 
 from .asset import Asset, PartialAsset
 from .channel import DMChannel, GroupDMChannel, SavedMessageChannel
@@ -16,7 +15,7 @@ from .utils import Ulid
 if TYPE_CHECKING:
     from .member import Member
     from .state import State
-    from .types import File
+    from .types import File, UserBot, UserRelation
     from .types import Status as StatusPayload
     from .types import User as UserPayload
     from .types import UserProfile as UserProfileData
@@ -24,20 +23,27 @@ if TYPE_CHECKING:
 
 __all__ = ("User", "Status", "Relation", "UserProfile")
 
+
 class Relation(NamedTuple):
     """A namedtuple representing a relation between the bot and a user"""
+
     type: RelationshipType
     user: User
 
+
 class Status(NamedTuple):
     """A namedtuple representing a users status"""
+
     text: Optional[str]
     presence: Optional[PresenceType]
 
+
 class UserProfile(NamedTuple):
     """A namedtuple representing a users profile"""
+
     content: Optional[str]
     background: Optional[Asset]
+
 
 class User(Messageable, Ulid):
     """Represents a user
@@ -71,28 +77,46 @@ class User(Messageable, Ulid):
     privileged: :class:`bool`
         Whether the user is privileged
     """
-    __flattern_attributes__: tuple[str, ...] = ("id", "discriminator", "display_name", "bot", "owner_id", "badges", "online", "flags", "relations", "relationship", "status", "masquerade_avatar", "masquerade_name", "original_name", "original_avatar", "profile", "dm_channel", "privileged")
+
+    __flattern_attributes__: tuple[str, ...] = (
+        "id",
+        "discriminator",
+        "display_name",
+        "bot",
+        "owner_id",
+        "badges",
+        "online",
+        "flags",
+        "relations",
+        "relationship",
+        "status",
+        "masquerade_avatar",
+        "masquerade_name",
+        "original_name",
+        "original_avatar",
+        "profile",
+        "dm_channel",
+        "privileged",
+    )
     __slots__: tuple[str, ...] = (*__flattern_attributes__, "state", "_members")
 
     def __init__(self, data: UserPayload, state: State):
         self.state = state
-        self._members: WeakValueDictionary[str, Member] = WeakValueDictionary()  # we store all member versions of this user to avoid having to check every guild when needing to update.
+        self._members: WeakValueDictionary[
+            str, Member
+        ] = (
+            WeakValueDictionary()
+        )  # we store all member versions of this user to avoid having to check every guild when needing to update.
         self.id: str = data["_id"]
         self.discriminator: str = data["discriminator"]
         self.display_name: str | None = data.get("display_name")
         self.original_name: str = data["username"]
         self.dm_channel: DMChannel | SavedMessageChannel | None = None
 
-        bot = data.get("bot")
-
-        self.bot: bool
-        self.owner_id: str | None
-
-        if bot:
-            self.bot = True
-            self.owner_id = bot["owner"]
+        self.bot: UserBot | None = data.get("bot")
+        if self.bot:
+            self.owner_id = self.bot["owner"]
         else:
-            self.bot = False
             self.owner_id = None
 
         self.badges: UserBadges = UserBadges._from_value(data.get("badges", 0))
@@ -113,14 +137,20 @@ class User(Messageable, Ulid):
         self.relations: list[Relation] = relations
 
         relationship = data.get("relationship")
-        self.relationship: RelationshipType | None = RelationshipType(relationship) if relationship else None
+        self.relationship: RelationshipType | None = (
+            RelationshipType(relationship) if relationship else None
+        )
 
         status = data.get("status")
         self.status: Status | None
 
         if status:
             presence = status.get("presence")
-            self.status = Status(status.get("text"), PresenceType(presence) if presence else None) if status else None
+            self.status = (
+                Status(status.get("text"), PresenceType(presence) if presence else None)
+                if status
+                else None
+            )
         else:
             self.status = None
 
@@ -142,14 +172,26 @@ class User(Messageable, Ulid):
         if self.relationship in [RelationshipType.friend, RelationshipType.user]:
             return UserPermissions.all()
 
-        elif self.relationship in [RelationshipType.blocked, RelationshipType.blocked_other]:
+        elif self.relationship in [
+            RelationshipType.blocked,
+            RelationshipType.blocked_other,
+        ]:
             return UserPermissions(access=True)
 
-        elif self.relationship in [RelationshipType.incoming_friend_request, RelationshipType.outgoing_friend_request]:
+        elif self.relationship in [
+            RelationshipType.incoming_friend_request,
+            RelationshipType.outgoing_friend_request,
+        ]:
             permissions.access = True
 
         for channel in self.state.channels.values():
-            if (isinstance(channel, (GroupDMChannel, DMChannel)) and self.id in channel.recipient_ids) or any(self.id in (m.id for m in server.members) for server in self.state.servers.values()):
+            if (
+                isinstance(channel, (GroupDMChannel, DMChannel))
+                and self.id in channel.recipient_ids
+            ) or any(
+                self.id in (m.id for m in server.members)
+                for server in self.state.servers.values()
+            ):
                 if self.state.me.bot or self.bot:
                     permissions.send_message = True
 
@@ -173,7 +215,9 @@ class User(Messageable, Ulid):
         """
         perms = self.get_permissions()
 
-        return all([getattr(perms, key, False) == value for key, value in permissions.items()])
+        return all(
+            [getattr(perms, key, False) == value for key, value in permissions.items()]
+        )
 
     async def _get_channel_id(self):
         if not self.dm_channel:
@@ -190,10 +234,10 @@ class User(Messageable, Ulid):
     def owner(self) -> User:
         """:class:`User` the owner of the bot account"""
 
-        if not self.owner_id:
+        if not self.bot:
             raise LookupError
 
-        return self.state.get_user(self.owner_id)
+        return self.state.get_user(self.bot["owner"])
 
     @property
     def name(self) -> str:
@@ -223,11 +267,14 @@ class User(Messageable, Ulid):
         flags: Optional[int] = None,
         discriminator: Optional[str] = None,
         privileged: Optional[bool] = None,
-        username: Optional[str] = None
+        username: Optional[str] = None,
+        bot: Optional[UserBot] = None,
     ) -> None:
         if status is not None:
             presence = status.get("presence")
-            self.status = Status(status.get("text"), PresenceType(presence) if presence else None)
+            self.status = Status(
+                status.get("text"), PresenceType(presence) if presence else None
+            )
 
         if profile is not None:
             if background_file := profile.get("background"):
@@ -252,7 +299,9 @@ class User(Messageable, Ulid):
             for relation in relations:
                 user = self.state.get_user(relation["_id"])
                 if user:
-                    new_relations.append(Relation(RelationshipType(relation["status"]), user))
+                    new_relations.append(
+                        Relation(RelationshipType(relation["status"]), user)
+                    )
 
             self.relations = new_relations
 
@@ -271,6 +320,9 @@ class User(Messageable, Ulid):
         if username is not None:
             self.original_name = username
 
+        if bot:
+            self.bot = bot
+
         # update user infomation for all members
 
         if self.__class__ is User:
@@ -287,7 +339,8 @@ class User(Messageable, Ulid):
                     flags=flags,
                     discriminator=discriminator,
                     privileged=privileged,
-                    username=username
+                    username=username,
+                    bot=member.bot,
                 )
 
     async def default_avatar(self) -> bytes:
