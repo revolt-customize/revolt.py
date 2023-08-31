@@ -25,12 +25,6 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-os.environ[
-    "OPENAI_API_KEY"
-] = "X-ChatALL-AppKey:AI_Code-20230707,X-ChatALL-AppToken:5b752fa0004fdd6e,X-ChatALL-User:ailiyaer"
-os.environ["OPENAI_API_BASE"] = "http://ai.apiserver.baidu-int.com/v1"
-
-
 chat_open_ai = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.5, streaming=True)
 llm = OpenAI(streaming=True)
 
@@ -112,8 +106,8 @@ async def main():
     async with aiohttp.ClientSession() as session:
         client = Client(
             session,
-            "6wPMhu15mQ3pzVNu3mmL4lxtrNE7rweM6TtR_dZb3SU1_7cul9A8FGqGKD0LVLuL",
-            api_url="http://10.12.212.117:8800/api",
+            "bot token",
+            api_url="api url",
         )
         await client.start()
 
