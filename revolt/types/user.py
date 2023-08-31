@@ -16,18 +16,25 @@ __all__ = (
     "UserProfile",
 )
 
-Relation = Literal["Blocked", "BlockedOther", "Friend", "Incoming", "None", "Outgoing", "User"]
+Relation = Literal[
+    "Blocked", "BlockedOther", "Friend", "Incoming", "None", "Outgoing", "User"
+]
+
 
 class UserBot(TypedDict):
     owner: str
+    model: NotRequired[BotModel]
+
 
 class Status(TypedDict, total=False):
     text: str
     presence: Literal["Busy", "Idle", "Invisible", "Online"]
 
+
 class UserRelation(TypedDict):
     status: Relation
     _id: str
+
 
 class User(TypedDict):
     _id: str
@@ -44,6 +51,17 @@ class User(TypedDict):
     bot: NotRequired[UserBot]
     privileged: NotRequired[bool]
 
+
 class UserProfile(TypedDict, total=False):
     content: str
     background: File
+
+
+class BotModel(TypedDict):
+    model_name: str
+    prompts: Prompts
+    temperature: float
+
+
+class Prompts(TypedDict):
+    system_prompt: str

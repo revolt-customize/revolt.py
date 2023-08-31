@@ -664,10 +664,11 @@ class HttpClient:
         remove: list[str] | None,
         values: dict[str, Any],
     ) -> Request[MemberPayload]:
+        if remove:
+            values["remove"] = remove
+
         return self.request(
-            "PATCH",
-            f"/servers/{server_id}/members/{member_id}",
-            json={"remove": remove, **values},
+            "PATCH", f"/servers/{server_id}/members/{member_id}", json=values
         )
 
     def delete_messages(self, channel_id: str, messages: list[str]) -> Request[None]:

@@ -7,6 +7,7 @@ from .enums import ChannelType
 from .messageable import Messageable
 from .permissions import Permissions, PermissionsOverwrite
 from .utils import Missing, Ulid
+from abc import abstractmethod
 
 if TYPE_CHECKING:
     from .message import Message
@@ -23,7 +24,16 @@ if TYPE_CHECKING:
     from .types import TextChannel as TextChannelPayload
     from .user import User
 
-__all__ = ("DMChannel", "GroupDMChannel", "SavedMessageChannel", "TextChannel", "VoiceChannel", "Channel", "ServerChannel")
+__all__ = (
+    "DMChannel",
+    "GroupDMChannel",
+    "SavedMessageChannel",
+    "TextChannel",
+    "VoiceChannel",
+    "Channel",
+    "ServerChannel",
+)
+
 
 class EditableChannel:
     __slots__ = ()
@@ -65,6 +75,7 @@ class EditableChannel:
 
         await self.state.http.edit_channel(self.id, remove, kwargs)
 
+
 class Channel(Ulid):
     """Base class for all channels
 
@@ -77,6 +88,7 @@ class Channel(Ulid):
     server_id: Optional[:class:`str`]
         The server id of the chanel, if any
     """
+
     __slots__ = ("state", "id", "channel_type", "server_id")
 
     def __init__(self, data: ChannelPayload, state: State):
@@ -94,6 +106,10 @@ class Channel(Ulid):
     async def delete(self) -> None:
         """Deletes or closes the channel"""
         await self.state.http.close_channel(self.id)
+
+    @abstractmethod
+    def get_users_in_channel(self) -> list[str]:
+        return []
 
     @property
     def server(self) -> Server:
@@ -117,8 +133,15 @@ class Channel(Ulid):
 
 class SavedMessageChannel(Channel, Messageable):
     """The Saved Message Channel"""
+
     def __init__(self, data: SavedMessagesPayload, state: State):
         super().__init__(data, state)
+
+        self.users: list[str] = [data["user"]]
+
+    def get_users_in_channel(self) -> list[str]:
+        return self.users
+
 
 class DMChannel(Channel, Messageable):
     """A DM channel
@@ -135,6 +158,10 @@ class DMChannel(Channel, Messageable):
         super().__init__(data, state)
         self.recipient_ids: tuple[str, str] = tuple(data["recipients"])
         self.last_message_id: str | None = data.get("last_message_id")
+        self.users: list[str] = data.get("recipients", [])
+
+    def get_users_in_channel(self) -> list[str]:
+        return self.users
 
     @property
     def recipients(self) -> tuple[User, User]:
@@ -165,6 +192,7 @@ class DMChannel(Channel, Messageable):
 
         return self.state.get_message(self.last_message_id)
 
+
 class GroupDMChannel(Channel, Messageable, EditableChannel):
     """A group DM channel
 
@@ -186,7 +214,15 @@ class GroupDMChannel(Channel, Messageable, EditableChannel):
         The id of the last message in this channel, if any
     """
 
-    __slots__ = ("recipient_ids", "name", "owner_id", "permissions", "icon", "description", "last_message_id")
+    __slots__ = (
+        "recipient_ids",
+        "name",
+        "owner_id",
+        "permissions",
+        "icon",
+        "description",
+        "last_message_id",
+    )
 
     def __init__(self, data: GroupDMChannelPayload, state: State):
         super().__init__(data, state)
@@ -195,6 +231,10 @@ class GroupDMChannel(Channel, Messageable, EditableChannel):
         self.owner_id: str = data["owner"]
         self.description: str | None = data.get("description")
         self.last_message_id: str | None = data.get("last_message_id")
+
+        self.users: list[str] = data.get("recipients", [])
+        if data["owner"]:
+            self.users.append(data["owner"])
 
         self.icon: Asset | None
 
@@ -205,7 +245,13 @@ class GroupDMChannel(Channel, Messageable, EditableChannel):
 
         self.permissions: Permissions = Permissions(data.get("permissions", 0))
 
-    def _update(self, *, name: Optional[str] = None, recipients: Optional[list[str]] = None, description: Optional[str] = None) -> None:
+    def _update(
+        self,
+        *,
+        name: Optional[str] = None,
+        recipients: Optional[list[str]] = None,
+        description: Optional[str] = None,
+    ) -> None:
         if name is not None:
             self.name = name
 
@@ -214,6 +260,9 @@ class GroupDMChannel(Channel, Messageable, EditableChannel):
 
         if description is not None:
             self.description = description
+
+    def get_users_in_channel(self) -> list[str]:
+        return self.users
 
     @property
     def recipients(self) -> list[User]:
@@ -230,7 +279,9 @@ class GroupDMChannel(Channel, Messageable, EditableChannel):
         permissions: :class:`ChannelPermissions`
             The new default group permissions
         """
-        await self.state.http.set_group_channel_default_permissions(self.id, permissions.value)
+        await self.state.http.set_group_channel_default_permissions(
+            self.id, permissions.value
+        )
 
     @property
     def last_message(self) -> Message:
@@ -245,6 +296,7 @@ class GroupDMChannel(Channel, Messageable, EditableChannel):
             raise LookupError
 
         return self.state.get_message(self.last_message_id)
+
 
 class ServerChannel(Channel):
     """Base class for all guild channels
@@ -262,6 +314,7 @@ class ServerChannel(Channel):
     default_permissions: :class:`ChannelPermissions`
         The default permissions for all users in the text channel
     """
+
     def __init__(self, data: ServerChannelPayload, state: State):
         super().__init__(data, state)
 
@@ -270,7 +323,11 @@ class ServerChannel(Channel):
         self.description: Optional[str] = data.get("description")
         self.nsfw: bool = data.get("nsfw", False)
         self.active: bool = False
-        self.default_permissions: PermissionsOverwrite = PermissionsOverwrite._from_overwrite(data.get("default_permissions", {"a": 0, "d": 0}))
+        self.default_permissions: PermissionsOverwrite = (
+            PermissionsOverwrite._from_overwrite(
+                data.get("default_permissions", {"a": 0, "d": 0})
+            )
+        )
 
         permissions: dict[str, PermissionsOverwrite] = {}
 
@@ -295,9 +352,13 @@ class ServerChannel(Channel):
             The new default channel permissions
         """
         allow, deny = permissions.to_pair()
-        await self.state.http.set_guild_channel_default_permissions(self.id, allow.value, deny.value)
+        await self.state.http.set_guild_channel_default_permissions(
+            self.id, allow.value, deny.value
+        )
 
-    async def set_role_permissions(self, role: Role, permissions: PermissionsOverwrite) -> None:
+    async def set_role_permissions(
+        self, role: Role, permissions: PermissionsOverwrite
+    ) -> None:
         """Sets the permissions for a role in the channel.
         Parameters
         -----------
@@ -306,9 +367,21 @@ class ServerChannel(Channel):
         """
         allow, deny = permissions.to_pair()
 
-        await self.state.http.set_guild_channel_role_permissions(self.id, role.id, allow.value, deny.value)
+        await self.state.http.set_guild_channel_role_permissions(
+            self.id, role.id, allow.value, deny.value
+        )
 
-    def _update(self, *, name: Optional[str] = None, description: Optional[str] = None, icon: Optional[FilePayload] = None, nsfw: Optional[bool] = None, active: Optional[bool] = None, role_permissions: Optional[dict[str, OverwritePayload]] = None, default_permissions: Optional[OverwritePayload] = None):
+    def _update(
+        self,
+        *,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        icon: Optional[FilePayload] = None,
+        nsfw: Optional[bool] = None,
+        active: Optional[bool] = None,
+        role_permissions: Optional[dict[str, OverwritePayload]] = None,
+        default_permissions: Optional[OverwritePayload] = None,
+    ):
         if name is not None:
             self.name = name
 
@@ -334,7 +407,10 @@ class ServerChannel(Channel):
             self.permissions = permissions
 
         if default_permissions is not None:
-            self.default_permissions = PermissionsOverwrite._from_overwrite(default_permissions)
+            self.default_permissions = PermissionsOverwrite._from_overwrite(
+                default_permissions
+            )
+
 
 class TextChannel(ServerChannel, Messageable, EditableChannel):
     """A text channel
@@ -359,7 +435,14 @@ class TextChannel(ServerChannel, Messageable, EditableChannel):
         The description of the channel, if any
     """
 
-    __slots__ = ("name", "description", "last_message_id", "default_permissions", "icon", "overwrites")
+    __slots__ = (
+        "name",
+        "description",
+        "last_message_id",
+        "default_permissions",
+        "icon",
+        "overwrites",
+    )
 
     def __init__(self, data: TextChannelPayload, state: State):
         super().__init__(data, state)
@@ -382,6 +465,7 @@ class TextChannel(ServerChannel, Messageable, EditableChannel):
             raise LookupError
 
         return self.state.get_message(self.last_message_id)
+
 
 class VoiceChannel(ServerChannel, EditableChannel):
     """A voice channel
@@ -406,7 +490,10 @@ class VoiceChannel(ServerChannel, EditableChannel):
         The description of the channel, if any
     """
 
-def channel_factory(data: ChannelPayload, state: State) -> Union[DMChannel, GroupDMChannel, SavedMessageChannel, TextChannel, VoiceChannel]:
+
+def channel_factory(
+    data: ChannelPayload, state: State
+) -> Union[DMChannel, GroupDMChannel, SavedMessageChannel, TextChannel, VoiceChannel]:
     if data["channel_type"] == "SavedMessages":
         return SavedMessageChannel(data, state)
     elif data["channel_type"] == "DirectMessage":

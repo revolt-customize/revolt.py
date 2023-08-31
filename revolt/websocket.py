@@ -211,7 +211,6 @@ class WebsocketHandler:
 
         before = copy(message)
         message._update(**payload["data"])
-
         self.dispatch("message_update", before, message)
 
     async def handle_messagedelete(self, payload: MessageDeleteEventPayload) -> None:
@@ -231,6 +230,12 @@ class WebsocketHandler:
 
     async def handle_channelcreate(self, payload: ChannelCreateEventPayload) -> None:
         channel = self.state.add_channel(payload)
+
+        # avoid an api request if possible
+        for user in channel.get_users_in_channel():
+            if user not in self.state.users:
+                user = await self.state.http.fetch_user(user)
+                self.state.add_user(user)
 
         if server_id := channel.server_id:
             await self._wait_for_server_ready(server_id)
