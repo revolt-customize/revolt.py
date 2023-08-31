@@ -27,8 +27,6 @@ class StreamingLLMCallbackHandler(AsyncCallbackHandler):
         self.q = q
 
     async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
-        data = {"token": token}
-        print(data)
         await self.q.push_message(token)
 
     async def on_llm_end(
