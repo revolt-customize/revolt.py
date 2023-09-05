@@ -97,6 +97,7 @@ class Message(TypedDict):
     channel: str
     author: str
     content: str
+    session_id: NotRequired[str]
     components: NotRequired[list[Component]]
     system: NotRequired[SystemMessageContent]
     attachments: NotRequired[list[File]]

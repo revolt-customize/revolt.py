@@ -6,8 +6,6 @@ import time
 from copy import copy
 from typing import TYPE_CHECKING, Callable, NamedTuple, cast
 
-from .types.gateway import InteractionEventPayload
-
 from .errors import RevoltError
 from . import utils
 from .channel import GroupDMChannel, TextChannel, VoiceChannel
@@ -30,6 +28,8 @@ from .types import (
     MessageRemoveReactionEventPayload,
     MessageUnreactEventPayload,
     MessageUpdateEventPayload,
+    InteractionEventPayload,
+    MessagePatchEventPayload,
 )
 from .types import Role as RolePayload
 from .types import (
@@ -197,6 +197,9 @@ class WebsocketHandler:
 
         message = self.state.get_message(payload["message_id"])
         self.dispatch("interaction", payload, message)
+
+    async def handle_messagepatch(self, payload: MessagePatchEventPayload) -> None:
+        self.dispatch("message_patch", payload)
 
     async def handle_messageupdate(self, payload: MessageUpdateEventPayload) -> None:
         self.dispatch("raw_message_update", payload)

@@ -52,6 +52,7 @@ __all__ = (
     "MessageRemoveReactionEventPayload",
     "BulkMessageDeleteEventPayload",
     "InteractionEventPayload",
+    "MessagePatchEventPayload",
 )
 
 
@@ -271,3 +272,9 @@ class InteractionEventPayload(BasePayload):
     channel_id: str
     author_id: str
     content: str
+
+
+class MessagePatchEventPayload(BasePayload):
+    message_id: str
+    content: str
+    is_end: bool

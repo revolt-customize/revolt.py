@@ -57,7 +57,9 @@ class Message(Ulid):
     reactions: dict[str, list[:class:`User`]]
         The reactions on the message
     interactions: Optional[:class:`MessageInteractions`]
-        The interactions on the message, if any
+        The interactions on the message
+    session_id: Optional[str]
+        The session id of the message
     """
 
     __slots__ = (
@@ -75,6 +77,7 @@ class Message(Ulid):
         "reply_ids",
         "reactions",
         "interactions",
+        "session_id",
     )
 
     def __init__(self, data: MessagePayload, state: State):
@@ -93,6 +96,7 @@ class Message(Ulid):
         ]
 
         self.components: list[Component] = data.get("components", [])
+        self.session_id: str | None = data.get("session_id")
 
         channel = state.get_channel(data["channel"])
         assert isinstance(

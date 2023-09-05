@@ -240,6 +240,7 @@ class HttpClient:
         masquerade: Optional[MasqueradePayload],
         interactions: Optional[InteractionsPayload],
         components: Optional[list[Component]],
+        session_id: Optional[str],
         stream_generator: Optional[AsyncGenerator[str, None]] = None,
     ) -> MessagePayload:
         json: dict[str, Any] = {}
@@ -270,6 +271,9 @@ class HttpClient:
 
         if components:
             json["components"] = components
+
+        if session_id:
+            json["session_id"] = session_id
 
         if stream_generator:
             return await self.stream_request(
