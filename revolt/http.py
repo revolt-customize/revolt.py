@@ -15,7 +15,8 @@ from typing import (
 import aiohttp
 import ulid
 
-from .types.message import Component
+from .types.component import Component
+from dataclasses import asdict
 
 
 from .errors import Forbidden, HTTPError, ServerError
@@ -240,6 +241,7 @@ class HttpClient:
         masquerade: Optional[MasqueradePayload],
         interactions: Optional[InteractionsPayload],
         components: Optional[list[Component]],
+        session_id: Optional[str],
         stream_generator: Optional[AsyncGenerator[str, None]] = None,
     ) -> MessagePayload:
         json: dict[str, Any] = {}
@@ -269,7 +271,10 @@ class HttpClient:
             json["interactions"] = interactions
 
         if components:
-            json["components"] = components
+            json["components"] = [asdict(i) for i in components]
+
+        if session_id:
+            json["session_id"] = session_id
 
         if stream_generator:
             return await self.stream_request(
@@ -295,7 +300,7 @@ class HttpClient:
             json["embeds"] = embeds
 
         if components:
-            json["components"] = components
+            json["components"] = [asdict(i) for i in components]
 
         return self.request(
             "PATCH", f"/channels/{channel}/messages/{message}", json=json
