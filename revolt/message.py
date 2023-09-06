@@ -3,7 +3,10 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any, Coroutine, Optional, Union
 
-from .types.message import Component
+from .types.component import (
+    Component,
+    component_factory,
+)
 
 
 from .asset import Asset, PartialAsset
@@ -95,7 +98,9 @@ class Message(Ulid):
             to_embed(embed, state) for embed in data.get("embeds", [])
         ]
 
-        self.components: list[Component] = data.get("components", [])
+        self.components: list[Component] = [
+            component_factory(x) for x in data.get("components", [])
+        ]
         self.session_id: str | None = data.get("session_id")
 
         channel = state.get_channel(data["channel"])

@@ -5,7 +5,11 @@ import logging
 
 
 from revolt.types.gateway import InteractionEventPayload
-from revolt.types.message import Component
+from revolt.types.component import (
+    ButtonComponent,
+    LineBreakComponent,
+    StatusComponent,
+)
 
 logger = logging.getLogger("revolt")
 logger.setLevel(logging.DEBUG)
@@ -25,8 +29,12 @@ class Client(revolt.Client):
             f"Username: {user.name} Your choice is: {interaction['content']} "
         )
         components = message.components
-        components[0]["label"] = "edited"
-        components[0]["enabled"] = False
+        for com in components:
+            if isinstance(com, ButtonComponent):
+                com.label = "edited"
+                com.enabled = False
+            elif isinstance(com, StatusComponent):
+                com.label = "new status"
 
         # update the button component's label
         await message.edit(content="edited", components=components)
@@ -36,18 +44,13 @@ class Client(revolt.Client):
             await message.channel.send(
                 "you have these options",
                 components=[
-                    Component(
-                        type="button",
+                    ButtonComponent(
                         style="color:white; backgroundColor:green; fontSize:16px; fontWeight:400;",
                         label="continue",
                         enabled=True,
                     ),
-                    Component(
-                        type="button", style="color:green", label="quit", enabled=True
-                    ),
-                    Component(
-                        type="button", style="color:red", label="restart", enabled=False
-                    ),
+                    LineBreakComponent(),
+                    StatusComponent(label="this is status window"),
                 ],
             )
 

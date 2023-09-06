@@ -7,6 +7,7 @@ from typing_extensions import NotRequired
 if TYPE_CHECKING:
     from .embed import Embed
     from .file import File
+    from .component import ComponentPayload
 
 
 __all__ = (
@@ -24,7 +25,6 @@ __all__ = (
     "Message",
     "MessageReplyPayload",
     "SystemMessageContent",
-    "Component",
 )
 
 
@@ -98,7 +98,7 @@ class Message(TypedDict):
     author: str
     content: str
     session_id: NotRequired[str]
-    components: NotRequired[list[Component]]
+    components: NotRequired[list[ComponentPayload]]
     system: NotRequired[SystemMessageContent]
     attachments: NotRequired[list[File]]
     embeds: NotRequired[list[Embed]]
@@ -113,10 +113,3 @@ class Message(TypedDict):
 class MessageReplyPayload(TypedDict):
     id: str
     mention: bool
-
-
-class Component(TypedDict):
-    type: str
-    label: str
-    style: str
-    enabled: bool

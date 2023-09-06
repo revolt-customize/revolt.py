@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, AsyncGenerator, Optional
 
-from .types.message import Component
 
 from .enums import SortType
 
@@ -11,6 +10,7 @@ if TYPE_CHECKING:
     from .file import File
     from .message import Masquerade, Message, MessageInteractions, MessageReply
     from .state import State
+    from .types.component import Component
 
 
 __all__ = ("Messageable",)

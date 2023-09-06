@@ -15,7 +15,8 @@ from typing import (
 import aiohttp
 import ulid
 
-from .types.message import Component
+from .types.component import Component
+from dataclasses import asdict
 
 
 from .errors import Forbidden, HTTPError, ServerError
@@ -270,7 +271,7 @@ class HttpClient:
             json["interactions"] = interactions
 
         if components:
-            json["components"] = components
+            json["components"] = [asdict(i) for i in components]
 
         if session_id:
             json["session_id"] = session_id
@@ -299,7 +300,7 @@ class HttpClient:
             json["embeds"] = embeds
 
         if components:
-            json["components"] = components
+            json["components"] = [asdict(i) for i in components]
 
         return self.request(
             "PATCH", f"/channels/{channel}/messages/{message}", json=json
